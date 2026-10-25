@@ -1,0 +1,50 @@
+name: Build BlockCraft (Windows)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10'
+      - name: Compile and test
+        shell: pwsh
+        run: gradle clean test build
+      - name: Package Windows application image
+        shell: pwsh
+        run: gradle packageWindows
+      - name: Upload build reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blockcraft-build-reports
+          path: |
+            build/reports/**
+            build/test-results/**
+          if-no-files-found: ignore
+      - name: Upload Windows application package
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlockCraft-Windows-x64
+          path: build/package/BlockCraft/**
+          if-no-files-found: error
+          retention-days: 14
