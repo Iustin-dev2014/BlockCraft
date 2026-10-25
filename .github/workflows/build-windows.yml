@@ -23,11 +23,39 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
-        with:
-          cmdline-tools-version: '15859902'
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+      # Do not use android-actions/setup-android here: its legacy default
+      # package "tools" no longer exists in the Android SDK repository.
+      - name: Locate Android SDK
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sdk = $env:ANDROID_HOME
+          if (-not $sdk) { $sdk = $env:ANDROID_SDK_ROOT }
+          if (-not $sdk) { $sdk = 'C:\Android\android-sdk' }
+          if (-not (Test-Path $sdk)) {
+            New-Item -ItemType Directory -Force -Path $sdk | Out-Null
+          }
+          "ANDROID_HOME=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "ANDROID_SDK_ROOT=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $sdkManager = Get-ChildItem -Path $sdk -Filter sdkmanager.bat -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $sdkManager) {
+            $toolsZip = Join-Path $env:RUNNER_TEMP 'android-command-line-tools.zip'
+            $toolsDir = Join-Path $sdk 'cmdline-tools'
+            New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
+            Invoke-WebRequest -Uri 'https://dl.google.com/android/repository/commandlinetools-win-12266719_latest.zip' -OutFile $toolsZip
+            $extractDir = Join-Path $env:RUNNER_TEMP 'android-cli'
+            Expand-Archive -LiteralPath $toolsZip -DestinationPath $extractDir -Force
+            $versionDir = Join-Path $toolsDir 'latest'
+            New-Item -ItemType Directory -Force -Path $versionDir | Out-Null
+            Copy-Item -Path (Join-Path $extractDir 'cmdline-tools\*') -Destination $versionDir -Recurse -Force
+            $sdkManager = Get-Item (Join-Path $versionDir 'bin\sdkmanager.bat')
+          }
+          $sdkManagerPath = $sdkManager.FullName
+          "ANDROID_SDKMANAGER=$sdkManagerPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          & $sdkManagerPath --sdk_root=$sdk --licenses < $null
+          if ($LASTEXITCODE -ne 0) { throw 'Android SDK license setup failed.' }
+          & $sdkManagerPath --sdk_root=$sdk 'platform-tools' 'platforms;android-35' 'build-tools;35.0.0'
+          if ($LASTEXITCODE -ne 0) { throw 'Android SDK package installation failed.' }
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -37,9 +65,12 @@ jobs:
       - name: Verify Java, Android SDK and Gradle
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           java -version
           gradle --version
-          sdkmanager --list_installed
+          if (-not (Test-Path (Join-Path $env:ANDROID_HOME 'platforms/android-35/android.jar'))) {
+            throw 'Android API 35 platform is missing.'
+          }
 
       - name: Build Windows application and Android APK
         shell: pwsh
@@ -56,8 +87,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path $windowsDir, $androidDir, $releaseDir | Out-Null
 
           $windowsImage = Join-Path $PWD 'build/package/BlockCraft'
-          if (-not (Test-Path (Join-Path $windowsImage 'BlockCraft.exe'))) {
-            throw 'Windows packaging did not produce BlockCraft.exe.'
+          $exe = Join-Path $windowsImage 'BlockCraft.exe'
+          if (-not (Test-Path $exe)) {
+            throw "Windows packaging did not produce BlockCraft.exe at $exe"
           }
           Copy-Item -Path (Join-Path $windowsImage '*') -Destination $windowsDir -Recurse -Force
 
@@ -67,19 +99,19 @@ jobs:
           }
           Copy-Item $apk (Join-Path $androidDir 'BlockCraft-Android-Android10Plus.apk') -Force
 
-          $installNotes = @'
+          @'
           BlockCraft combined build
           =========================
           Windows: open Windows/BlockCraft/BlockCraft.exe.
           Keep the complete Windows/BlockCraft folder together; the executable uses bundled runtime files.
           Android: install Android/BlockCraft-Android-Android10Plus.apk on Android 10 (API 29) or newer.
           This is an early rendering prototype, not yet a complete voxel sandbox game.
-          '@
-          Set-Content -Path (Join-Path $bundle 'README-INSTALL.txt') -Value $installNotes -Encoding UTF8
+          '@ | Set-Content -Path (Join-Path $bundle 'README-INSTALL.txt') -Encoding UTF8
 
           $zip = Join-Path $releaseDir 'BlockCraft-Windows-Android.zip'
           if (Test-Path $zip) { Remove-Item $zip -Force }
           Compress-Archive -Path (Join-Path $bundle '*') -DestinationPath $zip -CompressionLevel Optimal
+          if (-not (Test-Path $zip)) { throw 'Combined ZIP was not created.' }
           Get-Item $zip | Format-List FullName, Length
 
       - name: Upload combined Windows + Android ZIP
