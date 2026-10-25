@@ -13,6 +13,11 @@ public final class Main {
     private static float px=128.5f, pz=128.5f, yaw=0f, pitch=-12f, vy=0f;
     private static boolean grounded=true;
     private static int selected=1, broken=0;
+    private static boolean paused=false, chatOpen=false, creativeMode=false, survivalMode=true;
+    private static boolean escWasDown=false, tWasDown=false;
+    private static String worldName="World", chatText="", status="Ready";
+    private static final GameConfig config=new GameConfig();
+    private static double worldTime=0;
     private static final java.util.Map<String,Integer> edits=new java.util.HashMap<>();
     private Main() {}
     public static void main(String[] args) {
@@ -24,13 +29,30 @@ public final class Main {
             glfwWindowHint(GLFW_RESIZABLE,GLFW_TRUE);
             window=glfwCreateWindow(WIDTH,HEIGHT,"BlockCraft — Voxel World",MemoryUtil.NULL,MemoryUtil.NULL);
             if(window==MemoryUtil.NULL) throw new IllegalStateException("Unable to create game window");
-            glfwMakeContextCurrent(window); glfwSwapInterval(1); glfwShowWindow(window); GL.createCapabilities();
+            config.load();
+            glfwMakeContextCurrent(window); glfwSwapInterval(config.vsync?1:0); glfwShowWindow(window); GL.createCapabilities();
+            glfwSetWindowTitle(window,"BlockCraft — "+worldName+" | WASD move · Space jump · T chat · ESC menu");
+            glfwSetCharCallback(window,(win,codepoint)->{if(chatOpen){if(codepoint>=32&&codepoint<127)chatText+=Character.toString((char)codepoint);}});
+            glfwSetKeyCallback(window,(win,key,scancode,action,mods)->{
+                if(action==GLFW_PRESS&&key==GLFW_KEY_BACKSPACE&&chatOpen&&!chatText.isEmpty())chatText=chatText.substring(0,chatText.length()-1);
+                if(action==GLFW_PRESS&&key==GLFW_KEY_ENTER&&chatOpen){status=chatText.startsWith("/")?"Command: "+chatText:"Chat: "+chatText;chatText="";chatOpen=false;}
+            });
             glEnable(GL_DEPTH_TEST); glClearColor(0.48f,0.72f,0.95f,1f);
             double last=glfwGetTime();
             while(!glfwWindowShouldClose(window)) {
                 glfwPollEvents();
-                if(glfwGetKey(window,GLFW_KEY_ESCAPE)==GLFW_PRESS) glfwSetWindowShouldClose(window,true);
+                boolean escDown=glfwGetKey(window,GLFW_KEY_ESCAPE)==GLFW_PRESS;
+                if(escDown&&!escWasDown){if(chatOpen){chatOpen=false;chatText="";}else{paused=!paused;glfwSetWindowTitle(window,paused?"BlockCraft — PAUSED | ESC resume · F5 save · Q menu":"BlockCraft — "+worldName+" | WASD move · Space jump · T chat · ESC menu");if(paused)saveWorld();}}
+                escWasDown=escDown;
+                boolean tDown=glfwGetKey(window,GLFW_KEY_T)==GLFW_PRESS;
+                if(tDown&&!tWasDown&&!paused){chatOpen=!chatOpen;chatText="";glfwSetWindowTitle(window,chatOpen?"BlockCraft Chat — type and press ENTER":"BlockCraft — "+worldName+" | WASD move · T chat · ESC menu");}
+                tWasDown=tDown;
+                if(glfwGetKey(window,GLFW_KEY_F5)==GLFW_PRESS)saveWorld();
+                if(glfwGetKey(window,GLFW_KEY_F11)==GLFW_PRESS){config.graphics=config.graphics.equals("HIGH")?"ULTRA":"HIGH";config.save();status="Graphics preset: "+config.graphics;}
+                if(paused&&glfwGetKey(window,GLFW_KEY_Q)==GLFW_PRESS){saveWorld();paused=false;glfwSetWindowTitle(window,"BlockCraft — "+worldName);}
+                if(paused){glClearColor(0.025f,0.045f,0.08f,1f);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);glfwSwapBuffers(window);continue;}
                 double now=glfwGetTime(); float dt=(float)Math.min(0.05,now-last); last=now;
+                worldTime=(worldTime+dt)%1200.0;
                 if(glfwGetKey(window,GLFW_KEY_LEFT)==GLFW_PRESS) yaw-=100*dt;
                 if(glfwGetKey(window,GLFW_KEY_RIGHT)==GLFW_PRESS) yaw+=100*dt;
                 if(glfwGetKey(window,GLFW_KEY_UP)==GLFW_PRESS) pitch=Math.min(55,pitch+70*dt);
@@ -48,9 +70,11 @@ public final class Main {
                 if(glfwGetKey(window,GLFW_KEY_2)==GLFW_PRESS) selected=2;
                 if(glfwGetKey(window,GLFW_KEY_3)==GLFW_PRESS) selected=3;
                 if(glfwGetKey(window,GLFW_KEY_4)==GLFW_PRESS) selected=4;
-                if(glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_LEFT)==GLFW_PRESS) edits.put(targetKey(false),0);
-                if(glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_RIGHT)==GLFW_PRESS) edits.put(targetKey(true),selected);
+                if(!chatOpen&&glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_LEFT)==GLFW_PRESS) edits.put(targetKey(false),0);
+                if(!chatOpen&&glfwGetMouseButton(window,GLFW_MOUSE_BUTTON_RIGHT)==GLFW_PRESS) edits.put(targetKey(true),selected);
                 int[] w={1},h={1}; glfwGetFramebufferSize(window,w,h); glViewport(0,0,w[0],h[0]);
+                float daylight=(float)(0.5+0.5*Math.sin(worldTime*Math.PI/600.0));
+                glClearColor(0.025f+0.42f*daylight,0.035f+0.64f*daylight,0.09f+0.83f*daylight,1f);
                 glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
                 glMatrixMode(GL_PROJECTION); glLoadIdentity(); float aspect=h[0]==0?1:(float)w[0]/h[0]; glFrustum(-aspect,aspect,-1,1,1.2,100);
                 glMatrixMode(GL_MODELVIEW); glLoadIdentity();
@@ -60,6 +84,8 @@ public final class Main {
                 gluLookAt(px-lookX*5,height((int)px,(int)pz)+3.6f-lookY*5,pz-lookZ*5,px+lookX*3,height((int)px,(int)pz)+1.2f+lookY*3,pz+lookZ*3);
                 drawWorld();
                 drawCube(px,height((int)px,(int)pz)+0.9f,pz,0.2f,0.35f,0.9f,0.85f);
+                if(chatOpen)glfwSetWindowTitle(window,"CHAT: "+chatText+" | ENTER send · BACKSPACE delete · ESC close");
+                else glfwSetWindowTitle(window,"BlockCraft | "+worldName+" | "+(creativeMode?"CREATIVE":"SURVIVAL")+" | Blocks "+BlockRegistry.all().size()+" | "+status);
                 glfwSwapBuffers(window);
             }
         } finally { if(window!=MemoryUtil.NULL)glfwDestroyWindow(window);glfwTerminate();GLFWErrorCallback cb=glfwSetErrorCallback(null);if(cb!=null)cb.free(); }
@@ -70,6 +96,10 @@ public final class Main {
         float ux=sy*fz-sz*fy,uy=sz*fx-sx*fz,uz=sx*fy-sy*fx;
         float[] m={sx,ux,-fx,0, sy,uy,-fy,0, sz,uz,-fz,0,0,0,0,1};
         glMultMatrixf(m);glTranslatef(-ex,-ey,-ez);
+    }
+    private static void saveWorld() {
+        try { WorldSave.save(worldName,px,pz,yaw,pitch,selected,edits); status="World saved"; }
+        catch(Exception e){status="Save failed: "+e.getMessage();}
     }
     private static void drawWorld() {
         int cx=(int)px,cz=(int)pz;
