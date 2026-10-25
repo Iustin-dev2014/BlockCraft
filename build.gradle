@@ -1,10 +1,11 @@
 plugins {
     id 'java'
     id 'application'
+    id 'com.android.application' version '8.7.3' apply false
 }
 
 group = 'dev.iustin.blockcraft'
-version = '0.1.0-alpha.1'
+version = '0.1.0-alpha.2'
 
 repositories { mavenCentral() }
 
@@ -40,10 +41,11 @@ tasks.register('packageWindows', Exec) {
     def installDir = layout.buildDirectory.dir('install/BlockCraft').get().asFile
     def outputDir = layout.buildDirectory.dir('package').get().asFile
     doFirst {
-        outputDir.mkdirs()
-        if (!new File(installDir, 'lib/BlockCraft-${project.version}.jar').exists()) {
-            throw new GradleException('Expected application JAR was not produced by installDist.')
+        def appJar = new File(installDir, "lib/BlockCraft-${project.version}.jar")
+        if (!appJar.isFile()) {
+            throw new GradleException("Expected application JAR was not produced: ${appJar.absolutePath}")
         }
+        outputDir.mkdirs()
     }
     commandLine 'jpackage',
         '--type', 'app-image',
