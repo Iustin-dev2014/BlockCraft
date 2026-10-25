@@ -120,15 +120,15 @@ final class BlockCraftRenderer implements GLSurfaceView.Renderer {
     void nextBlock() { selectedBlock = (selectedBlock + 1) % 4; }
     void breakBlock() {
         int[] p = targetBlock();
-        long key = key(p[0], p[1]);
+        long key = key(p[0], p[1], p[2]);
         edits.put(key, (byte)0);
         blocksBroken++;
         rebuildMesh();
     }
     void placeBlock() {
         int[] p = targetBlock();
-        if (p[1] >= 0 && p[1] < 32) {
-            edits.put(key(p[0], p[1]), (byte)(selectedBlock + 1));
+        if (p[1] >= 0 && p[1] < 32 && p[0] > 0 && p[2] > 0 && p[0] < WORLD_SIZE-1 && p[2] < WORLD_SIZE-1) {
+            edits.put(key(p[0], p[1], p[2]), (byte)(selectedBlock + 1));
             rebuildMesh();
         }
     }
@@ -137,7 +137,7 @@ final class BlockCraftRenderer implements GLSurfaceView.Renderer {
         int x = Math.round(playerX + (float)Math.sin(r) * 3f);
         int z = Math.round(playerZ - (float)Math.cos(r) * 3f);
         int y = terrainHeight(x,z);
-        return new int[]{x,y};
+        return new int[]{x,y,z};
     }
     private static String blockName(int b) {
         switch (b) { case 0: return "Iarbă"; case 1: return "Pământ"; case 2: return "Piatră"; default: return "Lemn"; }
@@ -154,7 +154,7 @@ final class BlockCraftRenderer implements GLSurfaceView.Renderer {
             int block = blockAt(x,h,z);
             if (block == 0) continue;
             float[] top = color(block);
-            face(p,c,x,h+0.5f,z,top[0],top[1],top[2], -0.5f,0.5f,-0.5f, -0.5f,0.5f,0.5f, 0.5f,0.5f,0.5f, 0.5f,0.5f,-0.5f);
+            face(p,c,x,h,z,top[0],top[1],top[2], -0.5f,0.5f,-0.5f, -0.5f,0.5f,0.5f, 0.5f,0.5f,0.5f, 0.5f,0.5f,-0.5f);
             int[] nx={-1,1,0,0}, nz={0,0,-1,1};
             for (int d=0; d<4; d++) {
                 int nh=terrainHeight(x+nx[d],z+nz[d]);
@@ -166,11 +166,19 @@ final class BlockCraftRenderer implements GLSurfaceView.Renderer {
                 if(d==3) face(p,c,x,h+0.0f,z,top[0]*side,top[1]*side,top[2]*side,-0.5f,-0.5f,0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,0.5f);
             }
         }
+        for (Map.Entry<Long, Byte> entry : edits.entrySet()) {
+            if (entry.getValue() <= 0) continue;
+            long k=entry.getKey();
+            int x=(int)((k >>> 42)&0x1fffffL), z=(int)((k >>> 21)&0x1fffffL), y=(int)(k&0x1fffffL);
+            if (Math.abs(x-cx)>VIEW_RADIUS || Math.abs(z-cz)>VIEW_RADIUS) continue;
+            float[] bc=color(entry.getValue()==1?1:entry.getValue()==2?2:3);
+            cube(p,c,x,y,z,bc[0],bc[1],bc[2]);
+        }
         vertices=buffer(p.toArray()); colors=buffer(c.toArray()); vertexCount=p.size()/3;
     }
 
     private int blockAt(int x,int y,int z) {
-        Byte edit=edits.get(key(x,y));
+        Byte edit=edits.get(key(x,y,z));
         if(edit!=null) return edit;
         int h=terrainHeight(x,z);
         if(y>h) return 0;
@@ -183,7 +191,7 @@ final class BlockCraftRenderer implements GLSurfaceView.Renderer {
         double ridge=Math.sin(x*0.019+Math.cos(z*0.024))*1.8;
         return Math.max(1,Math.min(12,4+(int)Math.round(hills+ridge)));
     }
-    private static long key(int x,int y) { return (((long)x)<<32) ^ (y & 0xffffffffL); }
+    private static long key(int x,int y,int z) { long a = (((long)x & 0x1fffffL) << 42) | (((long)z & 0x1fffffL) << 21) | ((long)y & 0x1fffffL); return a; }
     private static float[] color(int block) {
         if(block==1) return new float[]{0.18f,0.63f,0.19f};
         if(block==2) return new float[]{0.43f,0.43f,0.45f};
@@ -193,6 +201,14 @@ final class BlockCraftRenderer implements GLSurfaceView.Renderer {
     private static void face(FloatList p,FloatList c,float x,float y,float z,float r,float g,float b,float...v) {
         int[] order={0,1,2,0,2,3};
         for(int i:order){p.add(x+v[i*3]);p.add(y+v[i*3+1]);p.add(z+v[i*3+2]);c.add(r);c.add(g);c.add(b);c.add(1f);}
+    }
+    private static void cube(FloatList p,FloatList c,float x,float y,float z,float r,float g,float b) {
+        face(p,c,x,y,z,r*0.75f,g*0.75f,b*0.75f,-0.5f,-0.5f,-0.5f,0.5f,-0.5f,-0.5f,0.5f,-0.5f,0.5f,-0.5f,-0.5f,0.5f);
+        face(p,c,x,y,z,r,g,b,-0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f);
+        face(p,c,x,y,z,r*0.9f,g*0.9f,b*0.9f,-0.5f,-0.5f,0.5f,0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,0.5f,0.5f);
+        face(p,c,x,y,z,r*0.65f,g*0.65f,b*0.65f,-0.5f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,-0.5f,0.5f,0.5f,-0.5f,0.5f,-0.5f);
+        face(p,c,x,y,z,r*0.8f,g*0.8f,b*0.8f,0.5f,-0.5f,-0.5f,0.5f,0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,0.5f);
+        face(p,c,x,y,z,r*0.85f,g*0.85f,b*0.85f,-0.5f,-0.5f,-0.5f,-0.5f,0.5f,-0.5f,0.5f,0.5f,-0.5f,0.5f,-0.5f,-0.5f);
     }
     private static int compileShader(int type,String source) {
         int shader=GLES20.glCreateShader(type); GLES20.glShaderSource(shader,source); GLES20.glCompileShader(shader);
