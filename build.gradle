@@ -40,6 +40,8 @@ tasks.register('packageWindows', Exec) {
     dependsOn installDist
     def installDir = layout.buildDirectory.dir('install/BlockCraft').get().asFile
     def outputDir = layout.buildDirectory.dir('package').get().asFile
+    // jpackage accepts numeric version components only; strip prerelease labels.
+    def windowsAppVersion = project.version.toString().split('-')[0]
     doFirst {
         def appJar = new File(installDir, "lib/BlockCraft-${project.version}.jar")
         if (!appJar.isFile()) {
@@ -50,7 +52,7 @@ tasks.register('packageWindows', Exec) {
     commandLine 'jpackage',
         '--type', 'app-image',
         '--name', 'BlockCraft',
-        '--app-version', project.version.toString(),
+        '--app-version', windowsAppVersion,
         '--input', new File(installDir, 'lib').absolutePath,
         '--main-jar', "BlockCraft-${project.version}.jar",
         '--main-class', application.mainClass.get(),
