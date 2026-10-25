@@ -127,6 +127,7 @@ final class BlockCraftRenderer implements GLSurfaceView.Renderer {
     }
     void placeBlock() {
         int[] p = targetBlock();
+        p[1]++;
         if (p[1] >= 0 && p[1] < 32 && p[0] > 0 && p[2] > 0 && p[0] < WORLD_SIZE-1 && p[2] < WORLD_SIZE-1) {
             edits.put(key(p[0], p[1], p[2]), (byte)(selectedBlock + 1));
             rebuildMesh();
