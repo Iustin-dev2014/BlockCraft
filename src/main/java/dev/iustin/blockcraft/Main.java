@@ -30,6 +30,18 @@ public final class Main {
             window=glfwCreateWindow(WIDTH,HEIGHT,"BlockCraft — Voxel World",MemoryUtil.NULL,MemoryUtil.NULL);
             if(window==MemoryUtil.NULL) throw new IllegalStateException("Unable to create game window");
             config.load();
+            try {
+                java.util.Properties saved=WorldSave.load(worldName);
+                px=Float.parseFloat(saved.getProperty("x",Float.toString(px)));
+                pz=Float.parseFloat(saved.getProperty("z",Float.toString(pz)));
+                yaw=Float.parseFloat(saved.getProperty("yaw",Float.toString(yaw)));
+                pitch=Float.parseFloat(saved.getProperty("pitch",Float.toString(pitch)));
+                selected=Integer.parseInt(saved.getProperty("selected",Integer.toString(selected)));
+                for(String key:saved.stringPropertyNames()) if(key.startsWith("block.")) {
+                    String coord=new String(java.util.Base64.getUrlDecoder().decode(key.substring(6)),java.nio.charset.StandardCharsets.UTF_8);
+                    edits.put(coord,Integer.parseInt(saved.getProperty(key)));
+                }
+            } catch(Exception ignored) { status="Starting a new world"; }
             glfwMakeContextCurrent(window); glfwSwapInterval(config.vsync?1:0); glfwShowWindow(window); GL.createCapabilities();
             glfwSetWindowTitle(window,"BlockCraft — "+worldName+" | WASD move · Space jump · T chat · ESC menu");
             glfwSetCharCallback(window,(win,codepoint)->{if(chatOpen){if(codepoint>=32&&codepoint<127)chatText+=Character.toString((char)codepoint);}});
