@@ -5,10 +5,12 @@ import android.app.AlertDialog;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
+import android.widget.FrameLayout;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -26,6 +28,8 @@ public final class BlockCraftActivity extends Activity {
     private static final String PREFS = "blockcraft_worlds";
     private static final String WORLD_NAMES = "names";
     private GLSurfaceView surface;
+    private BlockCraftRenderer gameRenderer;
+    private TextView inventoryLabel;
     private LinearLayout root;
     private ArrayList<String> worlds = new ArrayList<>();
     private ArrayAdapter<String> worldAdapter;
@@ -175,12 +179,90 @@ public final class BlockCraftActivity extends Activity {
 
     private void launchWorld() {
         if (selectedWorld == null) return;
+        FrameLayout game = new FrameLayout(this);
         surface = new GLSurfaceView(this);
         surface.setEGLContextClientVersion(2);
-        surface.setRenderer(new BlockCraftRenderer());
+        gameRenderer = new BlockCraftRenderer();
+        surface.setRenderer(gameRenderer);
         surface.setRenderMode(GLSurfaceView.RENDERMODE_CONTINUOUSLY);
-        setContentView(surface);
-        Toast.makeText(this, "Lume: " + selectedWorld + " • ESC / Înapoi pentru meniu", Toast.LENGTH_LONG).show();
+        game.addView(surface, new FrameLayout.LayoutParams(-1, -1));
+
+        inventoryLabel = new TextView(this);
+        inventoryLabel.setTextColor(0xFFFFFFFF);
+        inventoryLabel.setTextSize(12);
+        inventoryLabel.setPadding(dp(10), dp(6), dp(10), dp(6));
+        inventoryLabel.setBackgroundColor(0x990D1720);
+        inventoryLabel.setText("BLOCKCRAFT  •  LUME 256 × 256");
+        FrameLayout.LayoutParams status = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        status.topMargin = dp(8);
+        game.addView(inventoryLabel, status);
+
+        LinearLayout dpad = new LinearLayout(this);
+        dpad.setOrientation(LinearLayout.VERTICAL);
+        dpad.setGravity(Gravity.CENTER);
+        addControl(dpad, "▲", () -> gameRenderer.setMovement(1, 0), () -> gameRenderer.setMovement(0, 0), true);
+        LinearLayout middle = new LinearLayout(this);
+        middle.setGravity(Gravity.CENTER);
+        addControl(middle, "◀", () -> gameRenderer.setMovement(0, -1), () -> gameRenderer.setMovement(0, 0), true);
+        addControl(middle, "▼", () -> gameRenderer.setMovement(-1, 0), () -> gameRenderer.setMovement(0, 0), true);
+        addControl(middle, "▶", () -> gameRenderer.setMovement(0, 1), () -> gameRenderer.setMovement(0, 0), true);
+        dpad.addView(middle);
+        FrameLayout.LayoutParams dp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.LEFT);
+        dp.leftMargin = dp(10); dp.bottomMargin = dp(12);
+        game.addView(dpad, dp);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.VERTICAL);
+        actions.setGravity(Gravity.CENTER);
+        addControl(actions, "⤴ SARI", () -> gameRenderer.jump(), null, false);
+        addControl(actions, "SPARGE", () -> { gameRenderer.breakBlock(); updateInventoryLabel(); }, null, false);
+        addControl(actions, "PUNE", () -> { gameRenderer.placeBlock(); updateInventoryLabel(); }, null, false);
+        addControl(actions, "BLOC ▣", () -> { gameRenderer.nextBlock(); updateInventoryLabel(); }, null, false);
+        LinearLayout look = new LinearLayout(this);
+        look.setGravity(Gravity.CENTER);
+        addControl(look, "⟲", () -> gameRenderer.turn(-12, 0), null, false);
+        addControl(look, "⟳", () -> gameRenderer.turn(12, 0), null, false);
+        addControl(look, "↑", () -> gameRenderer.turn(0, -8), null, false);
+        addControl(look, "↓", () -> gameRenderer.turn(0, 8), null, false);
+        actions.addView(look);
+        FrameLayout.LayoutParams ap = new FrameLayout.LayoutParams(-2, -2, Gravity.RIGHT | Gravity.BOTTOM);
+        ap.rightMargin = dp(10); ap.bottomMargin = dp(12);
+        game.addView(actions, ap);
+
+        Button back = new Button(this);
+        back.setText("MENIU");
+        back.setTextSize(10);
+        FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(dp(78), dp(42), Gravity.TOP | Gravity.LEFT);
+        bp.leftMargin = dp(8); bp.topMargin = dp(8);
+        game.addView(back, bp);
+        back.setOnClickListener(v -> { surface.onPause(); gameRenderer = null; showMainMenu(); });
+        setContentView(game);
+        Toast.makeText(this, "Lume generată • folosește comenzile de pe ecran", Toast.LENGTH_LONG).show();
+    }
+
+    private void addControl(LinearLayout parent, String label, Runnable down, Runnable up, boolean hold) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setTextSize(hold ? 17 : 11);
+        b.setAllCaps(false);
+        b.setTextColor(0xFFFFFFFF);
+        b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(hold ? 0xAA245C42 : 0xDD243747));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(hold ? dp(54) : dp(68), dp(hold ? 52 : 42));
+        lp.setMargins(dp(2), dp(2), dp(2), dp(2));
+        parent.addView(b, lp);
+        if (hold) {
+            b.setOnTouchListener((v, e) -> {
+                if (e.getAction() == MotionEvent.ACTION_DOWN) { down.run(); return true; }
+                if (e.getAction() == MotionEvent.ACTION_UP || e.getAction() == MotionEvent.ACTION_CANCEL) { if (up != null) up.run(); return true; }
+                return true;
+            });
+        } else {
+            b.setOnClickListener(v -> { down.run(); if (inventoryLabel != null && gameRenderer != null) updateInventoryLabel(); });
+        }
+    }
+
+    private void updateInventoryLabel() {
+        if (inventoryLabel != null && gameRenderer != null) inventoryLabel.setText(gameRenderer.inventoryText());
     }
 
     private void showSettings() {
