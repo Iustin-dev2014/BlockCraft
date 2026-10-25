@@ -5,8 +5,6 @@ on:
     branches: [main]
     paths:
       - 'src/**'
-      - 'src/main/resources/**'
-      - 'androidApp/**'
       - 'build.gradle'
       - 'settings.gradle'
       - 'gradle/**'
@@ -26,25 +24,20 @@ jobs:
     steps:
       - name: Checkout BlockCraft
         uses: actions/checkout@v4
-
       - name: Set up Java 21
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10'
-
       - name: Build standalone Windows application image
         run: gradle --no-daemon clean test packageWindows
-
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --yes --no-progress
-
       - name: Build full Windows installer
         shell: pwsh
         run: |
@@ -70,7 +63,6 @@ jobs:
             Write-Host "Installer size is informational; no minimum-size gate is applied."
             Get-FileHash $package.FullName -Algorithm SHA256
           }
-
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
