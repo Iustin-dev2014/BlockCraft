@@ -52,7 +52,7 @@ jobs:
           }
           $sdkManagerPath = $sdkManager.FullName
           "ANDROID_SDKMANAGER=$sdkManagerPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          & $sdkManagerPath --sdk_root=$sdk --licenses < $null
+          @('y','y','y','y','y','y','y','y','y','y') | & $sdkManagerPath --sdk_root=$sdk --licenses
           if ($LASTEXITCODE -ne 0) { throw 'Android SDK license setup failed.' }
           & $sdkManagerPath --sdk_root=$sdk 'platform-tools' 'platforms;android-35' 'build-tools;35.0.0'
           if ($LASTEXITCODE -ne 0) { throw 'Android SDK package installation failed.' }
