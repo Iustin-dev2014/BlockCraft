@@ -1,4 +1,4 @@
-name: Build BlockCraft (Windows)
+name: Build BlockCraft (Windows + Android)
 
 on:
   push:
@@ -11,26 +11,74 @@ permissions:
   contents: read
 
 jobs:
-  build-windows:
+  build-and-bundle:
     runs-on: windows-latest
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+
       - name: Set up Java 21
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10'
-      - name: Compile and test
+
+      - name: Build Windows application and Android APK
         shell: pwsh
-        run: gradle clean test build
-      - name: Package Windows application image
+        run: gradle clean test build packageWindows :androidApp:assembleDebug
+
+      - name: Create combined ZIP
         shell: pwsh
-        run: gradle packageWindows
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bundle = Join-Path $PWD 'build/release-bundle'
+          $windowsDir = Join-Path $bundle 'Windows/BlockCraft'
+          $androidDir = Join-Path $bundle 'Android'
+          $releaseDir = Join-Path $PWD 'build/release'
+          New-Item -ItemType Directory -Force -Path $windowsDir, $androidDir, $releaseDir | Out-Null
+
+          $windowsImage = Join-Path $PWD 'build/package/BlockCraft'
+          if (-not (Test-Path (Join-Path $windowsImage 'BlockCraft.exe'))) {
+            throw 'Windows packaging did not produce BlockCraft.exe.'
+          }
+          Copy-Item -Path (Join-Path $windowsImage '*') -Destination $windowsDir -Recurse -Force
+
+          $apk = Join-Path $PWD 'androidApp/build/outputs/apk/debug/androidApp-debug.apk'
+          if (-not (Test-Path $apk)) {
+            throw "Android APK was not produced at $apk"
+          }
+          Copy-Item $apk (Join-Path $androidDir 'BlockCraft-Android-Android10Plus.apk') -Force
+
+          @'
+          BlockCraft combined build
+          =========================
+          Windows: open Windows/BlockCraft/BlockCraft.exe.
+          Keep the complete Windows/BlockCraft folder together; the executable uses bundled runtime files.
+          Android: install Android/BlockCraft-Android-Android10Plus.apk on Android 10 (API 29) or newer.
+          This is an early rendering prototype, not yet a complete voxel sandbox game.
+          '@ | Set-Content -Path (Join-Path $bundle 'README-INSTALL.txt') -Encoding UTF8
+
+          $zip = Join-Path $releaseDir 'BlockCraft-Windows-Android.zip'
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path (Join-Path $bundle '*') -DestinationPath $zip -CompressionLevel Optimal
+          Get-Item $zip | Format-List FullName, Length
+
+      - name: Upload combined Windows + Android ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlockCraft-Windows-Android
+          path: build/release/BlockCraft-Windows-Android.zip
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload build reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -39,12 +87,6 @@ jobs:
           path: |
             build/reports/**
             build/test-results/**
+            androidApp/build/reports/**
           if-no-files-found: ignore
-      - name: Upload Windows application package
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: BlockCraft-Windows-x64
-          path: build/package/BlockCraft/**
-          if-no-files-found: error
           retention-days: 14
