@@ -5,6 +5,11 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryUtil;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import java.awt.image.BufferedImage;
+import java.awt.Graphics2D;
+import java.awt.Font;
+import java.awt.RenderingHints;
+import java.nio.ByteBuffer;
 
 /** Playable desktop voxel prototype: WASD movement, arrows to look, space to jump,
  * left click to mine, right click to place, 1-4 to choose block, ESC to exit. */
@@ -14,7 +19,8 @@ public final class Main {
     private static boolean grounded=true;
     private static int selected=1, broken=0;
     private static boolean paused=false, chatOpen=false, creativeMode=false, survivalMode=true;
-    private static boolean escWasDown=false, tWasDown=false;
+    private static boolean escWasDown=false, tWasDown=false, f3WasDown=false, firstPerson=true;
+    private static final java.util.Map<String,Integer> textTextures=new java.util.HashMap<>();
     private static String worldName="World", chatText="", status="Ready";
     private static final GameConfig config=new GameConfig();
     private static double worldTime=0;
@@ -43,7 +49,7 @@ public final class Main {
                 }
             } catch(Exception ignored) { status="Starting a new world"; }
             glfwMakeContextCurrent(window); glfwSwapInterval(config.vsync?1:0); glfwShowWindow(window); GL.createCapabilities();
-            glfwSetWindowTitle(window,"BlockCraft — "+worldName+" | WASD move · Space jump · T chat · ESC menu");
+            glfwSetWindowTitle(window,"BlockCraft — "+worldName+" | WASD move · Space jump · F3 camera · T chat · ESC menu");
             glfwSetCharCallback(window,(win,codepoint)->{if(chatOpen){if(codepoint>=32&&codepoint<127)chatText+=Character.toString((char)codepoint);}});
             glfwSetKeyCallback(window,(win,key,scancode,action,mods)->{
                 if(action==GLFW_PRESS&&key==GLFW_KEY_BACKSPACE&&chatOpen&&!chatText.isEmpty())chatText=chatText.substring(0,chatText.length()-1);
@@ -60,9 +66,13 @@ public final class Main {
                 if(tDown&&!tWasDown&&!paused){chatOpen=!chatOpen;chatText="";glfwSetWindowTitle(window,chatOpen?"BlockCraft Chat — type and press ENTER":"BlockCraft — "+worldName+" | WASD move · T chat · ESC menu");}
                 tWasDown=tDown;
                 if(glfwGetKey(window,GLFW_KEY_F5)==GLFW_PRESS)saveWorld();
+                boolean f3Down=glfwGetKey(window,GLFW_KEY_F3)==GLFW_PRESS;
+                if(f3Down&&!f3WasDown){firstPerson=!firstPerson;status=firstPerson?"First-person view":"Third-person view";}
+                f3WasDown=f3Down;
                 if(glfwGetKey(window,GLFW_KEY_F11)==GLFW_PRESS){config.graphics=config.graphics.equals("HIGH")?"ULTRA":"HIGH";config.save();status="Graphics preset: "+config.graphics;}
-                if(paused&&glfwGetKey(window,GLFW_KEY_Q)==GLFW_PRESS){saveWorld();paused=false;glfwSetWindowTitle(window,"BlockCraft — "+worldName);}
-                if(paused){glClearColor(0.025f,0.045f,0.08f,1f);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);glfwSwapBuffers(window);continue;}
+                if(paused&&glfwGetKey(window,GLFW_KEY_Q)==GLFW_PRESS){saveWorld();glfwSetWindowShouldClose(window,true);}
+                if(paused&&glfwGetKey(window,GLFW_KEY_ENTER)==GLFW_PRESS){paused=false;glfwSetWindowTitle(window,"BlockCraft — "+worldName);}
+                if(paused){int[] mw={1},mh={1};glfwGetFramebufferSize(window,mw,mh);glViewport(0,0,mw[0],mh[0]);glClearColor(0.025f,0.045f,0.08f,1f);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);drawPauseMenu(mw[0],mh[0]);glfwSwapBuffers(window);continue;}
                 double now=glfwGetTime(); float dt=(float)Math.min(0.05,now-last); last=now;
                 worldTime=(worldTime+dt)%1200.0;
                 if(glfwGetKey(window,GLFW_KEY_LEFT)==GLFW_PRESS) yaw-=100*dt;
@@ -93,16 +103,62 @@ public final class Main {
                 float lookX=(float)Math.sin(a)*(float)Math.cos(Math.toRadians(pitch));
                 float lookY=(float)Math.sin(Math.toRadians(pitch));
                 float lookZ=-(float)Math.cos(a)*(float)Math.cos(Math.toRadians(pitch));
-                gluLookAt(px-lookX*5,height((int)px,(int)pz)+3.6f-lookY*5,pz-lookZ*5,px+lookX*3,height((int)px,(int)pz)+1.2f+lookY*3,pz+lookZ*3);
+                float eyeX=px-lookX*(firstPerson?0f:5f), eyeY=height((int)px,(int)pz)+(firstPerson?1.55f:3.6f)-lookY*(firstPerson?0f:5f), eyeZ=pz-lookZ*(firstPerson?0f:5f);\n                gluLookAt(eyeX,eyeY,eyeZ,px+lookX*3,height((int)px,(int)pz)+1.2f+lookY*3,pz+lookZ*3);
                 drawWorld();
-                drawCube(px,height((int)px,(int)pz)+0.9f,pz,0.2f,0.35f,0.9f,0.85f);
+                if(!firstPerson)drawCube(px,height((int)px,(int)pz)+0.9f,pz,0.2f,0.35f,0.9f,0.85f);
                 if(chatOpen)glfwSetWindowTitle(window,"CHAT: "+chatText+" | ENTER send · BACKSPACE delete · ESC close");
                 else glfwSetWindowTitle(window,"BlockCraft | "+worldName+" | "+(creativeMode?"CREATIVE":"SURVIVAL")+" | Blocks "+BlockRegistry.all().size()+" | "+status);
                 glfwSwapBuffers(window);
             }
         } finally { if(window!=MemoryUtil.NULL)glfwDestroyWindow(window);glfwTerminate();GLFWErrorCallback cb=glfwSetErrorCallback(null);if(cb!=null)cb.free(); }
     }
-    private static void gluLookAt(float ex,float ey,float ez,float cx,float cy,float cz) {
+
+    private static void drawPauseMenu(int width,int height) {
+        glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+        glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); glOrtho(0,width,height,0,-1,1);
+        glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+        rect(0,0,width,height,0.015f,0.025f,0.05f,0.88f);
+        int panelW=Math.min(560,width-40), panelH=430, x=(width-panelW)/2, y=(height-panelH)/2;
+        rect(x,y,panelW,panelH,0.07f,0.10f,0.15f,0.98f);
+        rect(x,y,panelW,5,0.18f,0.72f,0.42f,1f);
+        drawText("BLOCKCRAFT",x+36,y+35,34,0.45f,0.95f,0.68f,width,height);
+        drawText("GAME PAUSED",x+38,y+90,22,1f,1f,1f,width,height);
+        drawText("Press ENTER to resume",x+38,y+145,18,0.88f,0.91f,0.96f,width,height);
+        drawText("F5  Save world",x+38,y+185,18,0.88f,0.91f,0.96f,width,height);
+        drawText("F3  Switch first / third person",x+38,y+225,18,0.88f,0.91f,0.96f,width,height);
+        drawText("Q   Save and quit to desktop",x+38,y+265,18,0.88f,0.91f,0.96f,width,height);
+        drawText("World: "+worldName,x+38,y+325,16,0.63f,0.72f,0.82f,width,height);
+        drawText("View: "+(firstPerson?"First person":"Third person"),x+38,y+355,16,0.63f,0.72f,0.82f,width,height);
+        glPopMatrix(); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW);
+        glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
+    }
+    private static void rect(float x,float y,float w,float h,float r,float g,float b,float a) {
+        glColor4f(r,g,b,a); glBegin(GL_QUADS); glVertex2f(x,y); glVertex2f(x+w,y); glVertex2f(x+w,y+h); glVertex2f(x,y+h); glEnd();
+    }
+    private static void drawText(String text,float x,float y,int size,float r,float g,float b,int screenW,int screenH) {
+        int tex=textTexture(text,size);
+        glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D,tex); glColor4f(r,g,b,1f);
+        int tw=Math.max(1,text.length()*size), th=size+8;
+        glBegin(GL_QUADS);
+        glTexCoord2f(0,1);glVertex2f(x,y);
+        glTexCoord2f(1,1);glVertex2f(x+tw,y);
+        glTexCoord2f(1,0);glVertex2f(x+tw,y+th);
+        glTexCoord2f(0,0);glVertex2f(x,y+th);
+        glEnd(); glDisable(GL_TEXTURE_2D);
+    }
+    private static int textTexture(String text,int size) {
+        String cacheKey=size+":"+text;
+        Integer cached=textTextures.get(cacheKey); if(cached!=null)return cached;
+        int w=Math.max(1,text.length()*size),h=size+8;
+        BufferedImage image=new BufferedImage(w,h,BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g=image.createGraphics(); g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g.setFont(new Font("SansSerif",Font.BOLD,size)); g.setColor(java.awt.Color.WHITE); g.drawString(text,1,size); g.dispose();
+        int[] pixels=new int[w*h]; image.getRGB(0,0,w,h,pixels,0,w); ByteBuffer bytes=MemoryUtil.memAlloc(w*h*4);
+        for(int yy=h-1;yy>=0;yy--)for(int xx=0;xx<w;xx++){int p=pixels[yy*w+xx];bytes.put((byte)((p>>16)&255)).put((byte)((p>>8)&255)).put((byte)(p&255)).put((byte)((p>>24)&255));}
+        bytes.flip(); int tex=glGenTextures(); glBindTexture(GL_TEXTURE_2D,tex); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR); glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,w,h,0,GL_RGBA,GL_UNSIGNED_BYTE,bytes); MemoryUtil.memFree(bytes);
+        textTextures.put(cacheKey,tex); return tex;
+    }
+\n    private static void gluLookAt(float ex,float ey,float ez,float cx,float cy,float cz) {
         float fx=cx-ex,fy=cy-ey,fz=cz-ez,fl=(float)Math.sqrt(fx*fx+fy*fy+fz*fz);fx/=fl;fy/=fl;fz/=fl;
         float sx=-fz,sy=0,sz=fx,sl=(float)Math.sqrt(sx*sx+sz*sz);sx/=sl;sz/=sl;
         float ux=sy*fz-sz*fy,uy=sz*fx-sx*fz,uz=sx*fy-sy*fx;
