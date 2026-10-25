@@ -1,5 +1,7 @@
 package dev.iustin.blockcraft.android;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
@@ -39,8 +41,36 @@ final class BlockCraftRenderer implements GLSurfaceView.Renderer {
     private long lastFrame;
     private int meshCenterX = Integer.MIN_VALUE, meshCenterZ = Integer.MIN_VALUE;
     private final Map<Long, Byte> edits = new HashMap<>();
+    private final SharedPreferences worldPrefs;
     private int selectedBlock = 1;
+
     private int blocksBroken = 0;
+
+    BlockCraftRenderer(Context context, String worldName) {
+        worldPrefs = context.getSharedPreferences("blockcraft_save_" + worldName.hashCode(), Context.MODE_PRIVATE);
+        playerX = worldPrefs.getFloat("player_x", 128.5f);
+        playerZ = worldPrefs.getFloat("player_z", 128.5f);
+        yaw = worldPrefs.getFloat("yaw", 0f);
+        pitch = worldPrefs.getFloat("pitch", -12f);
+        selectedBlock = worldPrefs.getInt("selected", 1);
+        blocksBroken = worldPrefs.getInt("broken", 0);
+        String saved = worldPrefs.getString("edits", "");
+        if (saved != null && !saved.isEmpty()) for (String item : saved.split(";")) {
+            String[] pair = item.split(",");
+            if (pair.length == 2) try { edits.put(Long.parseLong(pair[0]), Byte.parseByte(pair[1])); } catch (NumberFormatException ignored) { }
+        }
+    }
+
+    synchronized void saveState() {
+        StringBuilder data = new StringBuilder();
+        for (Map.Entry<Long, Byte> e : edits.entrySet()) {
+            if (data.length() > 0) data.append(';');
+            data.append(e.getKey()).append(',').append(e.getValue());
+        }
+        worldPrefs.edit().putFloat("player_x", playerX).putFloat("player_z", playerZ)
+                .putFloat("yaw", yaw).putFloat("pitch", pitch).putInt("selected", selectedBlock)
+                .putInt("broken", blocksBroken).putString("edits", data.toString()).apply();
+    }
 
     @Override public void onSurfaceCreated(GL10 unused, EGLConfig config) {
         GLES20.glClearColor(0.48f, 0.72f, 0.95f, 1f);
@@ -165,6 +195,22 @@ final class BlockCraftRenderer implements GLSurfaceView.Renderer {
                 if(d==1) face(p,c,x,h+0.0f,z,top[0]*side,top[1]*side,top[2]*side,0.5f,-0.5f,-0.5f,0.5f,0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,0.5f);
                 if(d==2) face(p,c,x,h+0.0f,z,top[0]*side,top[1]*side,top[2]*side,-0.5f,-0.5f,-0.5f,0.5f,-0.5f,-0.5f,0.5f,0.5f,-0.5f,-0.5f,0.5f,-0.5f);
                 if(d==3) face(p,c,x,h+0.0f,z,top[0]*side,top[1]*side,top[2]*side,-0.5f,-0.5f,0.5f,-0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,0.5f,-0.5f,0.5f);
+            }
+        }
+
+        // Deterministic trees: their positions stay the same whenever this world is reopened.
+        for (int tx=Math.max(3,cx-VIEW_RADIUS); tx<=Math.min(WORLD_SIZE-4,cx+VIEW_RADIUS); tx+=7) {
+            for (int tz=Math.max(3,cz-VIEW_RADIUS); tz<=Math.min(WORLD_SIZE-4,cz+VIEW_RADIUS); tz+=7) {
+                int seed=(tx*73428767) ^ (tz*912931);
+                if (Math.floorMod(seed, 5) != 0) continue;
+                int th=terrainHeight(tx,tz);
+                cube(p,c,tx,th+1,tz,0.38f,0.22f,0.10f);
+                cube(p,c,tx,th+2,tz,0.10f,0.42f,0.12f);
+                cube(p,c,tx+1,th+2,tz,0.12f,0.48f,0.13f);
+                cube(p,c,tx-1,th+2,tz,0.12f,0.48f,0.13f);
+                cube(p,c,tx,th+2,tz+1,0.12f,0.48f,0.13f);
+                cube(p,c,tx,th+2,tz-1,0.12f,0.48f,0.13f);
+                cube(p,c,tx,th+3,tz,0.08f,0.36f,0.10f);
             }
         }
         for (Map.Entry<Long, Byte> entry : edits.entrySet()) {
