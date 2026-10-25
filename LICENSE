@@ -1,0 +1,44 @@
+BLOCKCRAFT SOURCE-AVAILABLE PROPRIETARY LICENSE
+Version 1.0
+
+Copyright (c) 2026 Iustin Martac. All rights reserved.
+
+IMPORTANT NOTICE
+The source code may be publicly viewable in the BlockCraft repository. Public availability is provided for viewing and evaluation only. It does not make this project open source and does not grant general permission to reuse it.
+
+1. OWNERSHIP
+Unless a file or component explicitly states otherwise, the BlockCraft project, including its original source code, documentation, designs, branding, and original assets (the "Project Materials"), is owned by the copyright holder identified above and is protected by applicable copyright and other laws.
+
+2. PERMITTED USE
+You may access and view the publicly available Project Materials through the official repository for personal inspection and evaluation. No other rights are granted by this license.
+
+3. RESTRICTIONS
+Without prior, explicit, written permission from the copyright holder, you may not, to the extent permitted by applicable law:
+(a) copy, reproduce, or republish any Project Materials, in whole or in part;
+(b) modify, adapt, translate, or create derivative works from any Project Materials;
+(c) redistribute, sublicense, sell, rent, or otherwise commercially exploit any Project Materials;
+(d) bundle, repackage, mirror, or distribute the Project Materials or builds of the Project;
+(e) remove or alter copyright, ownership, or license notices; or
+(f) present the Project or derivative material as your own.
+
+4. NO IMPLIED LICENSE
+No rights are granted by implication, estoppel, or otherwise. A public repository, public commit, downloadable file, or visible source file is not permission to copy, modify, or redistribute the Project Materials.
+
+5. THIRD-PARTY MATERIALS
+Third-party libraries, tools, fonts, or other components may be included under separate licenses. Those components are governed by their own license terms. This license does not override third-party rights or grant rights the copyright holder does not own.
+
+6. EXCEPTIONS AND WRITTEN PERMISSION
+The copyright holder may grant written permission for specific uses. Any permission is limited to the scope expressly stated in that written authorization. Statutory rights that cannot lawfully be excluded remain unaffected.
+
+7. DISCLAIMER
+To the maximum extent permitted by applicable law, the Project Materials are provided "AS IS", without warranties or conditions of any kind, express or implied. The copyright holder is not liable for claims or damages arising from use of the Project Materials, except where liability cannot lawfully be excluded.
+
+8. TERMINATION
+Any permission expressly granted under this license terminates automatically if you materially violate its terms. Upon termination, you must stop the use that was permitted, subject to applicable law.
+
+9. GOVERNING LAW
+This license is subject to applicable copyright law and any mandatory consumer or other legal protections that apply. Nothing in this text removes rights that cannot legally be waived.
+
+For permission requests, contact the copyright holder through the contact details published in the official BlockCraft repository or profile.
+
+END OF LICENSE
