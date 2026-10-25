@@ -23,11 +23,13 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Android SDK
+      - name: Set up Android SDK command-line tools
         uses: android-actions/setup-android@v3
-        with:
-          tools: ''
-          packages: 'platforms;android-35,build-tools;35.0.0'
+
+      - name: Install Android SDK platform and build tools
+        shell: pwsh
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
