@@ -2,6 +2,7 @@ package dev.iustin.blockcraft.android;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -64,7 +65,7 @@ public final class BlockCraftActivity extends Activity {
         logo.setTextColor(0xFFFFFFFF);
         logo.setTextSize(36);
         logo.setGravity(Gravity.CENTER);
-        logo.setTypeface(null, 1);
+        logo.setTypeface(null, Typeface.BOLD);
         root.addView(logo, new LinearLayout.LayoutParams(-1, dp(70)));
 
         TextView subtitle = new TextView(this);
