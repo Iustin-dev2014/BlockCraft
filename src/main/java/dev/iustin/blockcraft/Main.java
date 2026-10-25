@@ -103,7 +103,8 @@ public final class Main {
                 float lookX=(float)Math.sin(a)*(float)Math.cos(Math.toRadians(pitch));
                 float lookY=(float)Math.sin(Math.toRadians(pitch));
                 float lookZ=-(float)Math.cos(a)*(float)Math.cos(Math.toRadians(pitch));
-                float eyeX=px-lookX*(firstPerson?0f:5f), eyeY=height((int)px,(int)pz)+(firstPerson?1.55f:3.6f)-lookY*(firstPerson?0f:5f), eyeZ=pz-lookZ*(firstPerson?0f:5f);\n                gluLookAt(eyeX,eyeY,eyeZ,px+lookX*3,height((int)px,(int)pz)+1.2f+lookY*3,pz+lookZ*3);
+                float eyeX=px-lookX*(firstPerson?0f:5f), eyeY=height((int)px,(int)pz)+(firstPerson?1.55f:3.6f)-lookY*(firstPerson?0f:5f), eyeZ=pz-lookZ*(firstPerson?0f:5f);
+                gluLookAt(eyeX,eyeY,eyeZ,px+lookX*3,height((int)px,(int)pz)+1.2f+lookY*3,pz+lookZ*3);
                 drawWorld();
                 if(!firstPerson)drawCube(px,height((int)px,(int)pz)+0.9f,pz,0.2f,0.35f,0.9f,0.85f);
                 if(chatOpen)glfwSetWindowTitle(window,"CHAT: "+chatText+" | ENTER send · BACKSPACE delete · ESC close");
