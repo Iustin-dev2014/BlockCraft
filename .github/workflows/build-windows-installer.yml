@@ -1,0 +1,64 @@
+name: Build BlockCraft Windows Installer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle/**'
+      - 'installer/**'
+      - '.github/workflows/build-windows-installer.yml'
+      - 'LICENSE'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout BlockCraft
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10'
+
+      - name: Build standalone Windows application image
+        run: gradle --no-daemon clean test packageWindows
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build full Windows installer
+        shell: pwsh
+        run: |
+          $iscc = "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $iscc)) { throw "Inno Setup compiler was not found at $iscc" }
+          & $iscc "installer\BlockCraft.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+          Get-ChildItem build\installer\*.exe | ForEach-Object {
+            Write-Host ("Installer size: {0:N1} MB" -f ($_.Length / 1MB))
+            Get-FileHash $_.FullName -Algorithm SHA256
+          }
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlockCraft-Windows-Installer
+          path: build/installer/BlockCraft-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 30
