@@ -1,0 +1,58 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'dev.iustin.blockcraft'
+version = '0.1.0-alpha.1'
+
+repositories { mavenCentral() }
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+def lwjglVersion = '3.3.4'
+
+dependencies {
+    implementation platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
+    implementation 'org.lwjgl:lwjgl'
+    implementation 'org.lwjgl:lwjgl-glfw'
+    implementation 'org.lwjgl:lwjgl-opengl'
+
+    runtimeOnly "org.lwjgl:lwjgl::natives-windows"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::natives-windows"
+    runtimeOnly "org.lwjgl:lwjgl-opengl::natives-windows"
+}
+
+application {
+    mainClass = 'dev.iustin.blockcraft.Main'
+    applicationDefaultJvmArgs = ['-Xms256m', '-Xmx2G']
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+tasks.register('packageWindows', Exec) {
+    dependsOn installDist
+    def installDir = layout.buildDirectory.dir('install/BlockCraft').get().asFile
+    def outputDir = layout.buildDirectory.dir('package').get().asFile
+    doFirst {
+        outputDir.mkdirs()
+        if (!new File(installDir, 'lib/BlockCraft-${project.version}.jar').exists()) {
+            throw new GradleException('Expected application JAR was not produced by installDist.')
+        }
+    }
+    commandLine 'jpackage',
+        '--type', 'app-image',
+        '--name', 'BlockCraft',
+        '--app-version', project.version.toString(),
+        '--input', new File(installDir, 'lib').absolutePath,
+        '--main-jar', "BlockCraft-${project.version}.jar",
+        '--main-class', application.mainClass.get(),
+        '--dest', outputDir.absolutePath,
+        '--java-options', '-Xms256m',
+        '--java-options', '-Xmx2G'
+}
