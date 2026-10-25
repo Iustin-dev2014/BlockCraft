@@ -26,6 +26,10 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android platform and build tools
+        shell: pwsh
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -57,14 +61,15 @@ jobs:
           }
           Copy-Item $apk (Join-Path $androidDir 'BlockCraft-Android-Android10Plus.apk') -Force
 
-          @'
+          $installNotes = @'
           BlockCraft combined build
           =========================
           Windows: open Windows/BlockCraft/BlockCraft.exe.
           Keep the complete Windows/BlockCraft folder together; the executable uses bundled runtime files.
           Android: install Android/BlockCraft-Android-Android10Plus.apk on Android 10 (API 29) or newer.
           This is an early rendering prototype, not yet a complete voxel sandbox game.
-          '@ | Set-Content -Path (Join-Path $bundle 'README-INSTALL.txt') -Encoding UTF8
+          '@
+          Set-Content -Path (Join-Path $bundle 'README-INSTALL.txt') -Value $installNotes -Encoding UTF8
 
           $zip = Join-Path $releaseDir 'BlockCraft-Windows-Android.zip'
           if (Test-Path $zip) { Remove-Item $zip -Force }
