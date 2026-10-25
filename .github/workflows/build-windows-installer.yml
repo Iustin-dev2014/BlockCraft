@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   windows-installer:
-    runs-on: windows-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout BlockCraft
         uses: actions/checkout@v4
