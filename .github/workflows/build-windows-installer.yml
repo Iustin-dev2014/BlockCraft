@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'src/**'
+      - 'src/main/resources/**'
+      - 'androidApp/**'
       - 'build.gradle'
       - 'settings.gradle'
       - 'gradle/**'
@@ -60,9 +62,15 @@ jobs:
           Write-Host "Using Inno Setup compiler: $iscc"
           & $iscc "installer\BlockCraft.iss"
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
-          Get-ChildItem build\installer\*.exe | ForEach-Object {
-            Write-Host ("Installer size: {0:N1} MB" -f ($_.Length / 1MB))
-            Get-FileHash $_.FullName -Algorithm SHA256
+          $packages = Get-ChildItem build\installer\*.exe
+          if (!$packages) { throw "No installer EXE was produced." }
+          foreach ($package in $packages) {
+            $sizeMB = [math]::Round($package.Length / 1MB, 1)
+            Write-Host ("Installer size: {0:N1} MB" -f $sizeMB)
+            if ($package.Length -lt 250MB) {
+              throw "Installer is only $sizeMB MB. Release blocked: the requested minimum is 250 MB of real game assets. Do not pad the installer artificially."
+            }
+            Get-FileHash $package.FullName -Algorithm SHA256
           }
 
       - name: Upload Windows installer
