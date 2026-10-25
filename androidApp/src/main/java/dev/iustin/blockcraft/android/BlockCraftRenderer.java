@@ -36,7 +36,7 @@ final class BlockCraftRenderer implements GLSurfaceView.Renderer {
     private FloatBuffer vertices, colors;
     private int vertexCount;
     private float playerX = 128.5f, playerZ = 128.5f, yaw = 0f, pitch = -12f;
-    private float moveForward, moveSide, verticalVelocity;
+    private float moveForward, moveSide, verticalVelocity, jumpHeight;
     private boolean grounded = true;
     private long lastFrame;
     private int meshCenterX = Integer.MIN_VALUE, meshCenterZ = Integer.MIN_VALUE;
@@ -108,8 +108,8 @@ final class BlockCraftRenderer implements GLSurfaceView.Renderer {
         float lookX = (float) Math.sin(yr) * (float) Math.cos(pr);
         float lookY = (float) Math.sin(pr);
         float lookZ = (float) -Math.cos(yr) * (float) Math.cos(pr);
-        Matrix.setLookAtM(view, 0, playerX, terrainHeight((int) playerX, (int) playerZ) + 1.62f,
-                playerZ, playerX + lookX, terrainHeight((int) playerX, (int) playerZ) + 1.62f + lookY,
+        Matrix.setLookAtM(view, 0, playerX, terrainHeight((int) playerX, (int) playerZ) + 1.62f + jumpHeight,
+                playerZ, playerX + lookX, terrainHeight((int) playerX, (int) playerZ) + 1.62f + jumpHeight + lookY,
                 playerZ + lookZ, 0f, 1f, 0f);
         Matrix.multiplyMM(vp, 0, projection, 0, view, 0);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
@@ -137,13 +137,14 @@ final class BlockCraftRenderer implements GLSurfaceView.Renderer {
         if (Math.abs(terrainHeight((int)playerX,(int)nz)-terrainHeight((int)playerX,(int)playerZ)) <= 1) playerZ = nz;
         if (!grounded) {
             verticalVelocity -= 18f * dt;
-            if (verticalVelocity <= 0) { verticalVelocity = 0; grounded = true; }
+            jumpHeight += verticalVelocity * dt;
+            if (jumpHeight <= 0f) { jumpHeight = 0f; verticalVelocity = 0f; grounded = true; }
         }
     }
 
     void setMovement(float forward, float side) { moveForward = forward; moveSide = side; }
     void turn(float dx, float dy) { yaw += dx; pitch = clamp(pitch - dy, -65f, 65f); }
-    void jump() { if (grounded) { grounded = false; verticalVelocity = 6.3f; } }
+    void jump() { if (grounded) { grounded = false; verticalVelocity = 6.3f; jumpHeight = 0f; } }
     synchronized String inventoryText() {
         return "INVENTAR  |  Blocuri sparte: " + blocksBroken + "  |  Selectat: " + blockName(selectedBlock);
     }
