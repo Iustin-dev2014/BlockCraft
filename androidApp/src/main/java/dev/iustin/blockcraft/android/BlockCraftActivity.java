@@ -182,7 +182,7 @@ public final class BlockCraftActivity extends Activity {
         FrameLayout game = new FrameLayout(this);
         surface = new GLSurfaceView(this);
         surface.setEGLContextClientVersion(2);
-        gameRenderer = new BlockCraftRenderer();
+        gameRenderer = new BlockCraftRenderer(this, selectedWorld);
         surface.setRenderer(gameRenderer);
         surface.setRenderMode(GLSurfaceView.RENDERMODE_CONTINUOUSLY);
         game.addView(surface, new FrameLayout.LayoutParams(-1, -1));
@@ -235,7 +235,7 @@ public final class BlockCraftActivity extends Activity {
         FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(dp(78), dp(42), Gravity.TOP | Gravity.LEFT);
         bp.leftMargin = dp(8); bp.topMargin = dp(8);
         game.addView(back, bp);
-        back.setOnClickListener(v -> { surface.onPause(); gameRenderer = null; showMainMenu(); });
+        back.setOnClickListener(v -> { if (gameRenderer != null) gameRenderer.saveState(); surface.onPause(); gameRenderer = null; showMainMenu(); });
         setContentView(game);
         Toast.makeText(this, "Lume generată • folosește comenzile de pe ecran", Toast.LENGTH_LONG).show();
     }
@@ -277,7 +277,9 @@ public final class BlockCraftActivity extends Activity {
 
     @Override public void onBackPressed() {
         if (surface != null) {
+            if (gameRenderer != null) gameRenderer.saveState();
             if (surface != null) surface.onPause();
+            gameRenderer = null;
             showMainMenu();
         } else {
             super.onBackPressed();
@@ -285,6 +287,7 @@ public final class BlockCraftActivity extends Activity {
     }
 
     @Override protected void onPause() {
+        if (gameRenderer != null) gameRenderer.saveState();
         if (surface != null) surface.onPause();
         super.onPause();
     }
