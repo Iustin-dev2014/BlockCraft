@@ -159,7 +159,8 @@ public final class Main {
         bytes.flip(); int tex=glGenTextures(); glBindTexture(GL_TEXTURE_2D,tex); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR); glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,w,h,0,GL_RGBA,GL_UNSIGNED_BYTE,bytes); MemoryUtil.memFree(bytes);
         textTextures.put(cacheKey,tex); return tex;
     }
-\n    private static void gluLookAt(float ex,float ey,float ez,float cx,float cy,float cz) {
+
+    private static void gluLookAt(float ex,float ey,float ez,float cx,float cy,float cz) {
         float fx=cx-ex,fy=cy-ey,fz=cz-ez,fl=(float)Math.sqrt(fx*fx+fy*fy+fz*fz);fx/=fl;fy/=fl;fz/=fl;
         float sx=-fz,sy=0,sz=fx,sl=(float)Math.sqrt(sx*sx+sz*sz);sx/=sl;sz/=sl;
         float ux=sy*fz-sz*fy,uy=sz*fx-sx*fz,uz=sx*fy-sy*fx;
